@@ -1,12 +1,5 @@
 // Funciones JavaScript para el sistema de biblioteca
-
 document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
     // Auto-ocultar alertas después de 5 segundos
     setTimeout(function() {
         var alerts = document.querySelectorAll('.alert');
@@ -60,30 +53,4 @@ function buscarEnTabla(inputId, tableId) {
         }
         tr[i].style.display = found ? '' : 'none';
     }
-}
-
-// Función para exportar datos a CSV
-function exportarCSV(tableId, filename) {
-    var table = document.getElementById(tableId);
-    var rows = table.querySelectorAll('tr');
-    var csv = [];
-    
-    for (var i = 0; i < rows.length; i++) {
-        var row = [], cols = rows[i].querySelectorAll('td, th');
-        
-        for (var j = 0; j < cols.length; j++) {
-            row.push('"' + (cols[j].innerText || '').replace(/"/g, '""') + '"');
-        }
-        
-        csv.push(row.join(','));
-    }
-
-    var csvFile = new Blob([csv.join('\n')], { type: 'text/csv' });
-    var downloadLink = document.createElement('a');
-    downloadLink.download = filename;
-    downloadLink.href = window.URL.createObjectURL(csvFile);
-    downloadLink.style.display = 'none';
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
 }

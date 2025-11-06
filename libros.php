@@ -1,6 +1,54 @@
-{% extends "layout.html" %}
+<?php
+require_once 'includes/auth.php';
+requireLogin();
+require_once 'config/database.php';
 
-{% block content %}
+$database = new Database();
+$db = $database->getConnection();
+
+// Agregar libro
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['agregar_libro'])) {
+    $isbn = $_POST['isbn'];
+    $titulo = $_POST['titulo'];
+    $autor = $_POST['autor'];
+    $editorial = $_POST['editorial'];
+    $anio_publicacion = $_POST['anio_publicacion'];
+    $categoria = $_POST['categoria'];
+    $ejemplares = $_POST['ejemplares'];
+    
+    try {
+        $query = "INSERT INTO libros (isbn, titulo, autor, editorial, anio_publicacion, categoria, ejemplares, ejemplares_disponibles) 
+                  VALUES (:isbn, :titulo, :autor, :editorial, :anio_publicacion, :categoria, :ejemplares, :ejemplares)";
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':isbn', $isbn);
+        $stmt->bindParam(':titulo', $titulo);
+        $stmt->bindParam(':autor', $autor);
+        $stmt->bindParam(':editorial', $editorial);
+        $stmt->bindParam(':anio_publicacion', $anio_publicacion);
+        $stmt->bindParam(':categoria', $categoria);
+        $stmt->bindParam(':ejemplares', $ejemplares);
+        
+        if ($stmt->execute()) {
+            $_SESSION['message'] = 'Libro agregado exitosamente';
+            $_SESSION['message_type'] = 'success';
+            header('Location: libros.php');
+            exit();
+        }
+    } catch (PDOException $e) {
+        $_SESSION['message'] = 'Error al agregar libro: ' . $e->getMessage();
+        $_SESSION['message_type'] = 'danger';
+    }
+}
+
+// Obtener lista de libros
+$query = "SELECT * FROM libros ORDER BY titulo";
+$stmt = $db->prepare($query);
+$stmt->execute();
+$libros = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+
+<?php include 'includes/header.php'; ?>
+
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
@@ -20,7 +68,7 @@
                 <h5>Inventario de Libros</h5>
             </div>
             <div class="card-body">
-                {% if libros %}
+                <?php if ($libros): ?>
                 <div class="table-responsive">
                     <table class="table table-striped">
                         <thead>
@@ -36,35 +84,39 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for libro in libros %}
+                            <?php foreach ($libros as $libro): ?>
                             <tr>
-                                <td>{{ libro.isbn or 'N/A' }}</td>
-                                <td><strong>{{ libro.titulo }}</strong></td>
-                                <td>{{ libro.autor }}</td>
-                                <td>{{ libro.editorial or 'N/A' }}</td>
-                                <td>{{ libro.categoria or 'General' }}</td>
-                                <td>{{ libro.ejemplares }}</td>
+                                <td><?php echo $libro['isbn'] ?: 'N/A'; ?></td>
+                                <td><strong><?php echo $libro['titulo']; ?></strong></td>
+                                <td><?php echo $libro['autor']; ?></td>
+                                <td><?php echo $libro['editorial'] ?: 'N/A'; ?></td>
+                                <td><?php echo $libro['categoria'] ?: 'General'; ?></td>
+                                <td><?php echo $libro['ejemplares']; ?></td>
                                 <td>
-                                    <span class="badge {% if libro.ejemplares_disponibles > 0 %}bg-success{% else %}bg-danger{% endif %}">
-                                        {{ libro.ejemplares_disponibles }}
+                                    <span class="badge <?php echo $libro['ejemplares_disponibles'] > 0 ? 'bg-success' : 'bg-danger'; ?>">
+                                        <?php echo $libro['ejemplares_disponibles']; ?>
                                     </span>
                                 </td>
                                 <td>
                                     <span class="badge 
-                                        {% if libro.estado == 'disponible' %}bg-success
-                                        {% elif libro.estado == 'prestado' %}bg-warning
-                                        {% else %}bg-secondary{% endif %}">
-                                        {{ libro.estado|title }}
+                                        <?php 
+                                        switch($libro['estado']) {
+                                            case 'disponible': echo 'bg-success'; break;
+                                            case 'prestado': echo 'bg-warning'; break;
+                                            default: echo 'bg-secondary';
+                                        }
+                                        ?>">
+                                        <?php echo ucfirst($libro['estado']); ?>
                                     </span>
                                 </td>
                             </tr>
-                            {% endfor %}
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-                {% else %}
+                <?php else: ?>
                 <p class="text-muted">No hay libros registrados en el sistema.</p>
-                {% endif %}
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -78,7 +130,7 @@
                 <h5 class="modal-title">Agregar Nuevo Libro</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('agregar_libro') }}">
+            <form method="POST" action="libros.php">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">ISBN</label>
@@ -117,10 +169,11 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar Libro</button>
+                    <button type="submit" name="agregar_libro" class="btn btn-primary">Guardar Libro</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-{% endblock %}
+
+<?php include 'includes/footer.php'; ?>

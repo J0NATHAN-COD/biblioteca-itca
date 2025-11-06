@@ -168,20 +168,6 @@ body {
     color: #0c5460;
 }
 
-/* Gráficos */
-.grafico-container {
-    background: var(--blanco);
-    padding: 1.5rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    margin-bottom: 1.5rem;
-}
-
-/* Badges */
-.badge-danger {
-    background-color: var(--rojo-primario);
-}
-
 /* Footer */
 .footer {
     background: var(--gris-oscuro);
