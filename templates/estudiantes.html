@@ -1,0 +1,127 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>Gestión de Préstamos</h2>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#realizarPrestamoModal">
+                Realizar Préstamo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Préstamos Activos -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Préstamos Activos</h5>
+            </div>
+            <div class="card-body">
+                {% if prestamos_activos %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Libro</th>
+                                <th>Estudiante</th>
+                                <th>Carnet</th>
+                                <th>Fecha Préstamo</th>
+                                <th>Fecha Devolución</th>
+                                <th>Días Restantes</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prestamo in prestamos_activos %}
+                            <tr>
+                                <td>
+                                    <strong>{{ prestamo.titulo }}</strong><br>
+                                    <small class="text-muted">ISBN: {{ prestamo.isbn }}</small>
+                                </td>
+                                <td>{{ prestamo.estudiante_nombre }}</td>
+                                <td>{{ prestamo.carnet }}</td>
+                                <td>{{ prestamo.fecha_prestamo.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ prestamo.fecha_devolucion_estimada.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if prestamo.dias_restantes < 0 %}
+                                        <span class="badge bg-danger">Atrasado {{ -prestamo.dias_restantes }} días</span>
+                                    {% else %}
+                                        <span class="badge {% if prestamo.dias_restantes <= 2 %}bg-warning{% else %}bg-success{% endif %}">
+                                            {{ prestamo.dias_restantes }} días
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('devolver_libro', prestamo_id=prestamo.id) }}" 
+                                       class="btn btn-success btn-sm"
+                                       onclick="return confirm('¿Está seguro de marcar este libro como devuelto?')">
+                                        Devolver
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No hay préstamos activos en este momento.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Realizar Préstamo -->
+<div class="modal fade" id="realizarPrestamoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Realizar Nuevo Préstamo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('realizar_prestamo') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Seleccionar Libro *</label>
+                        <select class="form-select" name="libro_id" required>
+                            <option value="">Seleccione un libro...</option>
+                            {% for libro in libros_disponibles %}
+                            <option value="{{ libro.id }}">
+                                {{ libro.titulo }} - {{ libro.autor }} (Disponibles: {{ libro.ejemplares_disponibles }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Seleccionar Estudiante *</label>
+                        <select class="form-select" name="estudiante_id" required>
+                            <option value="">Seleccione un estudiante...</option>
+                            {% for estudiante in estudiantes_activos %}
+                            <option value="{{ estudiante.id }}">
+                                {{ estudiante.nombre }} - {{ estudiante.carnet }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Días de Préstamo *</label>
+                        <select class="form-select" name="dias_prestamo" required>
+                            <option value="7">7 días</option>
+                            <option value="14" selected>14 días</option>
+                            <option value="21">21 días</option>
+                            <option value="30">30 días</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar Préstamo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

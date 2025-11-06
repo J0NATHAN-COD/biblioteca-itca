@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Bienvenido al Sistema de Biblioteca</h2>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <img src="{{ url_for('static', filename='img/logo-itca.png') }}" 
+                             alt="ITCA FEPADE" 
+                             style="max-width: 200px; margin-bottom: 2rem;">
+                    </div>
+                    <h3 class="text-danger mb-4">ITCA FEPADE</h3>
+                    <p class="lead mb-4">
+                        Sistema integral de gestión de biblioteca para el control de libros, 
+                        estudiantes y préstamos.
+                    </p>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg me-md-2">
+                            Iniciar Sesión
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-5">
+                <div class="col-md-4">
+                    <div class="card stats-card">
+                        <div class="card-body">
+                            <i class="fas fa-book fa-3x text-danger mb-3"></i>
+                            <h4 class="stats-number">Gestión de Libros</h4>
+                            <p class="stats-label">Control completo del inventario</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stats-card">
+                        <div class="card-body">
+                            <i class="fas fa-users fa-3x text-danger mb-3"></i>
+                            <h4 class="stats-number">Estudiantes</h4>
+                            <p class="stats-label">Registro con carnet y DUI</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stats-card">
+                        <div class="card-body">
+                            <i class="fas fa-chart-bar fa-3x text-danger mb-3"></i>
+                            <h4 class="stats-number">Reportes</h4>
+                            <p class="stats-label">Estadísticas y gráficos</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: 2px solid #dc3545;
+}
+.stats-card:hover {
+    transform: translateY(-10px);
+    transition: transform 0.3s ease;
+}
+</style>
+{% endblock %}
