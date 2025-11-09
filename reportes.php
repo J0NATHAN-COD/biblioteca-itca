@@ -1,222 +1,349 @@
 <?php
-require_once 'includes/auth.php';
-requireLogin();
-require_once 'config/database.php';
+session_start();
+if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
+    header("location: index.php");
+    exit;
+}
 
+require_once "config/database.php";
 $database = new Database();
 $db = $database->getConnection();
 
-// Obtener estadísticas
-$stats = [];
-
-// Total libros
-$query = "SELECT COUNT(*) as total FROM libros";
+// Obtener estadísticas para gráficos
+$stats_carreras = [];
+$query = "SELECT c.nombre as carrera, COUNT(p.id) as total 
+          FROM prestamos p 
+          JOIN carreras c ON p.carrera_id = c.id 
+          GROUP BY c.id, c.nombre 
+          ORDER BY total DESC";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$stats['total_libros'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$stats_carreras = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Total estudiantes
-$query = "SELECT COUNT(*) as total FROM estudiantes WHERE activo = TRUE";
+$stats_estado_laptops = [];
+$query = "SELECT estado, COUNT(*) as total FROM laptops GROUP BY estado";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$stats['total_estudiantes'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$stats_estado_laptops = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Préstamos activos
-$query = "SELECT COUNT(*) as total FROM prestamos WHERE estado = 'activo'";
+$stats_tipo_solicitante = [];
+$query = "SELECT tipo_solicitante, COUNT(*) as total FROM prestamos GROUP BY tipo_solicitante";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$stats['prestamos_activos'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$stats_tipo_solicitante = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Préstamos atrasados
-$query = "SELECT COUNT(*) as total FROM prestamos WHERE estado = 'activo' AND fecha_devolucion_estimada < CURDATE()";
+$stats_genero = [];
+$query = "SELECT genero, COUNT(*) as total FROM prestamos GROUP BY genero";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$stats['prestamos_atrasados'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$stats_genero = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Libros por categoría
-$query = "SELECT categoria, COUNT(*) as total FROM libros GROUP BY categoria";
-$stmt = $db->prepare($query);
-$stmt->execute();
-$libros_por_categoria = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Préstamos por mes
-$query = "SELECT MONTH(fecha_prestamo) as mes, COUNT(*) as total 
+// Obtener préstamos por fecha (últimos 7 días)
+$prestamos_por_fecha = [];
+$query = "SELECT fecha_prestamo, COUNT(*) as total 
           FROM prestamos 
-          WHERE YEAR(fecha_prestamo) = YEAR(CURDATE())
-          GROUP BY MONTH(fecha_prestamo)";
+          WHERE fecha_prestamo >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+          GROUP BY fecha_prestamo 
+          ORDER BY fecha_prestamo";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$prestamos_por_mes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Préstamos por carrera
-$query = "SELECT e.carrera, COUNT(p.id) as total 
-          FROM prestamos p
-          JOIN estudiantes e ON p.estudiante_id = e.id
-          GROUP BY e.carrera";
-$stmt = $db->prepare($query);
-$stmt->execute();
-$prestamos_por_carrera = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$prestamos_por_fecha = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-
-<?php include 'includes/header.php'; ?>
-
-<div class="row">
-    <div class="col-12">
-        <h2>Reportes y Estadísticas</h2>
-        <p class="text-muted">Estadísticas generales del sistema de biblioteca</p>
-    </div>
-</div>
-
-<!-- Estadísticas -->
-<div class="row">
-    <div class="col-md-3">
-        <div class="card stats-card">
-            <div class="card-body">
-                <h3 class="stats-number"><?php echo $stats['total_libros']; ?></h3>
-                <p class="stats-label">Total Libros</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stats-card">
-            <div class="card-body">
-                <h3 class="stats-number"><?php echo $stats['total_estudiantes']; ?></h3>
-                <p class="stats-label">Estudiantes</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stats-card">
-            <div class="card-body">
-                <h3 class="stats-number"><?php echo $stats['prestamos_activos']; ?></h3>
-                <p class="stats-label">Préstamos Activos</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stats-card">
-            <div class="card-body">
-                <h3 class="stats-number"><?php echo $stats['prestamos_atrasados']; ?></h3>
-                <p class="stats-label">Préstamos Atrasados</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Tablas de Reportes -->
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Libros por Categoría</h5>
-            </div>
-            <div class="card-body">
-                <?php if ($libros_por_categoria): ?>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Categoría</th>
-                                <th>Cantidad</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($libros_por_categoria as $categoria): ?>
-                            <tr>
-                                <td><?php echo $categoria['categoria'] ?: 'Sin categoría'; ?></td>
-                                <td>
-                                    <span class="badge bg-danger"><?php echo $categoria['total']; ?></span>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php else: ?>
-                <p class="text-muted">No hay datos de categorías.</p>
-                <?php endif; ?>
-            </div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes - ITCA FEPADE</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        body {
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #d32f2f;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        .user-info span {
+            margin-right: 15px;
+        }
+        .logout-btn {
+            background-color: white;
+            color: #d32f2f;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .nav {
+            background-color: #b71c1c;
+            padding: 10px;
+        }
+        .nav ul {
+            list-style: none;
+            display: flex;
+        }
+        .nav li {
+            margin-right: 20px;
+        }
+        .nav a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .nav a:hover, .nav a.active {
+            background-color: #d32f2f;
+        }
+        .container {
+            padding: 20px;
+        }
+        .section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid #d32f2f;
+            padding-bottom: 10px;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        .chart-card h3 {
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table th, table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        table th {
+            background-color: #f9f9f9;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ITCA FEPADE - Sistema de Biblioteca</h1>
+        <div class="user-info">
+            <span>Bienvenido, <?php echo $_SESSION["nombre"]; ?></span>
+            <a href="logout.php" class="logout-btn">Cerrar Sesión</a>
         </div>
     </div>
     
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Préstamos por Carrera</h5>
-            </div>
-            <div class="card-body">
-                <?php if ($prestamos_por_carrera): ?>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Carrera</th>
-                                <th>Préstamos</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($prestamos_por_carrera as $carrera): ?>
-                            <tr>
-                                <td><?php echo $carrera['carrera'] ?: 'No especificada'; ?></td>
-                                <td>
-                                    <span class="badge bg-danger"><?php echo $carrera['total']; ?></span>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+    <div class="nav">
+        <ul>
+            <li><a href="dashboard.php">Dashboard</a></li>
+            <li><a href="gestion_prestamos.php">Gestión de Préstamos</a></li>
+            <li><a href="gestion_laptops.php">Gestión de Laptops</a></li>
+            <li><a href="reportes.php" class="active">Reportes</a></li>
+        </ul>
+    </div>
+    
+    <div class="container">
+        <div class="section">
+            <h2>Estadísticas de Préstamos</h2>
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Préstamos por Carrera</h3>
+                    <canvas id="chartCarreras"></canvas>
                 </div>
-                <?php else: ?>
-                <p class="text-muted">No hay datos de préstamos por carrera.</p>
-                <?php endif; ?>
+                <div class="chart-card">
+                    <h3>Estado de Laptops</h3>
+                    <canvas id="chartEstadoLaptops"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Tipo de Solicitante</h3>
+                    <canvas id="chartTipoSolicitante"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Distribución por Género</h3>
+                    <canvas id="chartGenero"></canvas>
+                </div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Préstamos Mensuales -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5>Préstamos Mensuales - <?php echo date('Y'); ?></h5>
-            </div>
-            <div class="card-body">
-                <?php if ($prestamos_por_mes): ?>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
+        
+        <div class="section">
+            <h2>Préstamos Recientes (Últimos 7 Días)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Total de Préstamos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if(count($prestamos_por_fecha) > 0): ?>
+                        <?php foreach($prestamos_por_fecha as $prestamo): ?>
                             <tr>
-                                <th>Mes</th>
-                                <th>Total Préstamos</th>
+                                <td><?php echo $prestamo['fecha_prestamo']; ?></td>
+                                <td><?php echo $prestamo['total']; ?></td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <?php 
-                            $meses = [
-                                1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
-                                5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
-                                9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'
-                            ];
-                            
-                            foreach ($prestamos_por_mes as $prestamo): 
-                            ?>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="2">No hay préstamos en los últimos 7 días</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>Top Carreras con Más Préstamos</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Carrera</th>
+                        <th>Total de Préstamos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if(count($stats_carreras) > 0): ?>
+                        <?php foreach($stats_carreras as $carrera): ?>
                             <tr>
-                                <td><?php echo $meses[$prestamo['mes']] ?? 'Desconocido'; ?></td>
-                                <td>
-                                    <span class="badge bg-danger"><?php echo $prestamo['total']; ?></span>
-                                </td>
+                                <td><?php echo $carrera['carrera']; ?></td>
+                                <td><?php echo $carrera['total']; ?></td>
                             </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php else: ?>
-                <p class="text-muted">No hay datos de préstamos mensuales para este año.</p>
-                <?php endif; ?>
-            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="2">No hay datos de préstamos por carrera</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
-</div>
-
-<?php include 'includes/footer.php'; ?>
+    
+    <script>
+        // Gráfico de préstamos por carrera
+        const chartCarreras = new Chart(document.getElementById('chartCarreras'), {
+            type: 'bar',
+            data: {
+                labels: [<?php echo implode(',', array_map(function($item) { return "'" . $item['carrera'] . "'"; }, $stats_carreras)); ?>],
+                datasets: [{
+                    label: 'Préstamos por Carrera',
+                    data: [<?php echo implode(',', array_map(function($item) { return $item['total']; }, $stats_carreras)); ?>],
+                    backgroundColor: '#d32f2f',
+                    borderColor: '#b71c1c',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        // Gráfico de estado de laptops
+        const chartEstadoLaptops = new Chart(document.getElementById('chartEstadoLaptops'), {
+            type: 'pie',
+            data: {
+                labels: [<?php echo implode(',', array_map(function($item) { 
+                    if($item['estado'] == 'disponible') return "'Disponible'";
+                    else if($item['estado'] == 'prestado') return "'Prestado'";
+                    else if($item['estado'] == 'mantenimiento') return "'Mantenimiento'";
+                }, $stats_estado_laptops)); ?>],
+                datasets: [{
+                    data: [<?php echo implode(',', array_map(function($item) { return $item['total']; }, $stats_estado_laptops)); ?>],
+                    backgroundColor: [
+                        '#28a745',
+                        '#ffc107',
+                        '#dc3545'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+        
+        // Gráfico de tipo de solicitante
+        const chartTipoSolicitante = new Chart(document.getElementById('chartTipoSolicitante'), {
+            type: 'doughnut',
+            data: {
+                labels: [<?php echo implode(',', array_map(function($item) { 
+                    if($item['tipo_solicitante'] == 'alumno') return "'Alumno'";
+                    else if($item['tipo_solicitante'] == 'docente') return "'Docente'";
+                }, $stats_tipo_solicitante)); ?>],
+                datasets: [{
+                    data: [<?php echo implode(',', array_map(function($item) { return $item['total']; }, $stats_tipo_solicitante)); ?>],
+                    backgroundColor: [
+                        '#d32f2f',
+                        '#1976d2'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+        
+        // Gráfico de distribución por género
+        const chartGenero = new Chart(document.getElementById('chartGenero'), {
+            type: 'pie',
+            data: {
+                labels: [<?php echo implode(',', array_map(function($item) { 
+                    if($item['genero'] == 'hombre') return "'Hombre'";
+                    else if($item['genero'] == 'mujer') return "'Mujer'";
+                }, $stats_genero)); ?>],
+                datasets: [{
+                    data: [<?php echo implode(',', array_map(function($item) { return $item['total']; }, $stats_genero)); ?>],
+                    backgroundColor: [
+                        '#1976d2',
+                        '#c2185b'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+    </script>
+</body>
+</html>
+<?php unset($db); ?>

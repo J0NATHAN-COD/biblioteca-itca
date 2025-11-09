@@ -1,154 +1,249 @@
 <?php
-require_once 'includes/auth.php';
-requireLogin();
-require_once 'config/database.php';
+session_start();
+if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
+    header("location: index.php");
+    exit;
+}
 
+require_once "config/database.php";
 $database = new Database();
 $db = $database->getConnection();
 
-// Estadísticas
+// Obtener estadísticas
 $stats = [];
-
-// Total libros
-$query = "SELECT COUNT(*) as total FROM libros";
+$query = "SELECT COUNT(*) as total FROM laptops";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$stats['total_libros'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$stats['total_laptops'] = $stmt->fetchColumn();
 
-// Total estudiantes
-$query = "SELECT COUNT(*) as total FROM estudiantes WHERE activo = TRUE";
+$query = "SELECT COUNT(*) as total FROM laptops WHERE estado = 'disponible'";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$stats['total_estudiantes'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$stats['laptops_disponibles'] = $stmt->fetchColumn();
 
-// Préstamos activos
-$query = "SELECT COUNT(*) as total FROM prestamos WHERE estado = 'activo'";
+$query = "SELECT COUNT(*) as total FROM laptops WHERE estado = 'prestado'";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$stats['prestamos_activos'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$stats['laptops_prestadas'] = $stmt->fetchColumn();
 
-// Préstamos atrasados
-$query = "SELECT COUNT(*) as total FROM prestamos WHERE estado = 'activo' AND fecha_devolucion_estimada < CURDATE()";
+$query = "SELECT COUNT(*) as total FROM laptops WHERE estado = 'mantenimiento'";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$stats['prestamos_atrasados'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$stats['laptops_mantenimiento'] = $stmt->fetchColumn();
 
-// Libros más prestados
-$query = "SELECT l.titulo, COUNT(p.id) as veces_prestado 
-          FROM prestamos p 
-          JOIN libros l ON p.libro_id = l.id 
-          GROUP BY l.id, l.titulo 
-          ORDER BY veces_prestado DESC 
-          LIMIT 5";
+$query = "SELECT COUNT(*) as total FROM prestamos WHERE DATE(fecha_registro) = CURDATE()";
 $stmt = $db->prepare($query);
 $stmt->execute();
-$libros_populares = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$stats['prestamos_hoy'] = $stmt->fetchColumn();
 ?>
-
-<?php include 'includes/header.php'; ?>
-
-<div class="row">
-    <div class="col-12">
-        <h2>Dashboard Principal</h2>
-        <p class="text-muted">Bienvenido, <?php echo getUserName(); ?></p>
-    </div>
-</div>
-
-<!-- Estadísticas -->
-<div class="row">
-    <div class="col-md-3">
-        <div class="card stats-card">
-            <div class="card-body">
-                <h3 class="stats-number"><?php echo $stats['total_libros']; ?></h3>
-                <p class="stats-label">Total Libros</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stats-card">
-            <div class="card-body">
-                <h3 class="stats-number"><?php echo $stats['total_estudiantes']; ?></h3>
-                <p class="stats-label">Estudiantes Activos</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stats-card">
-            <div class="card-body">
-                <h3 class="stats-number"><?php echo $stats['prestamos_activos']; ?></h3>
-                <p class="stats-label">Préstamos Activos</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card stats-card">
-            <div class="card-body">
-                <h3 class="stats-number"><?php echo $stats['prestamos_atrasados']; ?></h3>
-                <p class="stats-label">Préstamos Atrasados</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Libros Más Prestados -->
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Libros Más Prestados</h5>
-            </div>
-            <div class="card-body">
-                <?php if ($libros_populares): ?>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Libro</th>
-                                <th>Veces Prestado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($libros_populares as $libro): ?>
-                            <tr>
-                                <td><?php echo $libro['titulo']; ?></td>
-                                <td>
-                                    <span class="badge bg-danger"><?php echo $libro['veces_prestado']; ?></span>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php else: ?>
-                <p class="text-muted">No hay datos de préstamos disponibles.</p>
-                <?php endif; ?>
-            </div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - ITCA FEPADE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        body {
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #d32f2f;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        .user-info span {
+            margin-right: 15px;
+        }
+        .logout-btn {
+            background-color: white;
+            color: #d32f2f;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .nav {
+            background-color: #b71c1c;
+            padding: 10px;
+        }
+        .nav ul {
+            list-style: none;
+            display: flex;
+        }
+        .nav li {
+            margin-right: 20px;
+        }
+        .nav a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .nav a:hover, .nav a.active {
+            background-color: #d32f2f;
+        }
+        .container {
+            padding: 20px;
+        }
+        .welcome {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #d32f2f;
+        }
+        .recent-activity {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        .recent-activity h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table th, table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        table th {
+            background-color: #f9f9f9;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ITCA FEPADE - Sistema de Biblioteca</h1>
+        <div class="user-info">
+            <span>Bienvenido, <?php echo $_SESSION["nombre"]; ?></span>
+            <a href="logout.php" class="logout-btn">Cerrar Sesión</a>
         </div>
     </div>
     
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Acciones Rápidas</h5>
+    <div class="nav">
+        <ul>
+            <li><a href="dashboard.php" class="active">Dashboard</a></li>
+            <li><a href="gestion_prestamos.php">Gestión de Préstamos</a></li>
+            <li><a href="gestion_laptops.php">Gestión de Laptops</a></li>
+            <li><a href="reportes.php">Reportes</a></li>
+        </ul>
+    </div>
+    
+    <div class="container">
+        <div class="welcome">
+            <h2>Bienvenido al Sistema de Gestión de Préstamos de Computadoras</h2>
+            <p>Desde aquí puedes gestionar los préstamos de laptops, ver estadísticas y generar reportes.</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Total de Laptops</h3>
+                <div class="stat-number"><?php echo $stats['total_laptops']; ?></div>
             </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="prestamos.php" class="btn btn-primary">
-                        Realizar Préstamo
-                    </a>
-                    <a href="libros.php" class="btn btn-outline-primary">
-                        Agregar Libro
-                    </a>
-                    <a href="estudiantes.php" class="btn btn-outline-primary">
-                        Registrar Estudiante
-                    </a>
-                    <a href="reportes.php" class="btn btn-outline-primary">
-                        Ver Reportes
-                    </a>
-                </div>
+            <div class="stat-card">
+                <h3>Laptops Disponibles</h3>
+                <div class="stat-number"><?php echo $stats['laptops_disponibles']; ?></div>
+            </div>
+            <div class="stat-card">
+                <h3>Laptops Prestadas</h3>
+                <div class="stat-number"><?php echo $stats['laptops_prestadas']; ?></div>
+            </div>
+            <div class="stat-card">
+                <h3>En Mantenimiento</h3>
+                <div class="stat-number"><?php echo $stats['laptops_mantenimiento']; ?></div>
+            </div>
+            <div class="stat-card">
+                <h3>Préstamos Hoy</h3>
+                <div class="stat-number"><?php echo $stats['prestamos_hoy']; ?></div>
             </div>
         </div>
+        
+        <div class="recent-activity">
+            <h2>Préstamos Recientes</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Estudiante</th>
+                        <th>Carnet</th>
+                        <th>Laptop</th>
+                        <th>Fecha</th>
+                        <th>Hora Entrega</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $query = "SELECT p.estudiante_nombre, p.carnet, l.codigo, p.fecha_prestamo, p.hora_entrega 
+                              FROM prestamos p 
+                              JOIN laptops l ON p.laptop_id = l.id 
+                              ORDER BY p.fecha_registro DESC 
+                              LIMIT 5";
+                    $stmt = $db->prepare($query);
+                    $stmt->execute();
+                    
+                    if($stmt->rowCount() > 0){
+                        while($row = $stmt->fetch(PDO::FETCH_ASSOC)){
+                            echo "<tr>";
+                            echo "<td>" . $row['estudiante_nombre'] . "</td>";
+                            echo "<td>" . $row['carnet'] . "</td>";
+                            echo "<td>" . $row['codigo'] . "</td>";
+                            echo "<td>" . $row['fecha_prestamo'] . "</td>";
+                            echo "<td>" . $row['hora_entrega'] . "</td>";
+                            echo "</tr>";
+                        }
+                    } else {
+                        echo "<tr><td colspan='5'>No hay préstamos recientes</td></tr>";
+                    }
+                    ?>
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
-
-<?php include 'includes/footer.php'; ?>
+</body>
+</html>
+<?php unset($db); ?>
